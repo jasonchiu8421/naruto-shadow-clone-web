@@ -1,49 +1,3 @@
-// ============================================
-// MODEL UPLOAD FEATURE (Single File)
-// ============================================
-let uploadedModelData = null;
-
-async function loadCustomModel() {
-  const fileInput = document.getElementById("model-upload");
-  const statusEl = document.getElementById("upload-status");
-  
-  if (!fileInput.files[0]) {
-    statusEl.textContent = "⚠️ Please select your model file!";
-    statusEl.style.color = "red";
-    return;
-  }
-  
-  try {
-    statusEl.textContent = "⏳ Loading model...";
-    statusEl.style.color = "blue";
-    
-    const fileContent = await fileInput.files[0].text();
-    const modelData = JSON.parse(fileContent);
-    
-    // Convert weightData array back to Uint8Array
-    const weightData = new Uint8Array(modelData.weightData);
-    
-    const modelArtifacts = {
-      modelTopology: modelData.modelTopology,
-      weightSpecs: modelData.weightSpecs,
-      weightData: weightData.buffer
-    };
-    
-    gestureModel = await tf.loadLayersModel(tf.io.fromMemory(modelArtifacts));
-    
-    statusEl.textContent = "✅ Model loaded! Make your hand sign!";
-    statusEl.style.color = "green";
-    console.log("✅ Custom model loaded!");
-  } catch (e) {
-    console.error("Failed to load model:", e);
-    statusEl.textContent = "❌ Error loading model. Try again.";
-    statusEl.style.color = "red";
-  }
-}
-
-// ============================================
-// ORIGINAL SCRIPT.JS CODE (from GitHub)
-// ============================================
 const video = document.getElementById("video");
 const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
@@ -56,13 +10,66 @@ let mask = null;
 // Trained gesture model
 // ----------------------
 let gestureModel = null;
+const statusEl = document.getElementById("upload-status");
 
-async function loadGestureModel() {
+function setStatus(text, color) {
+  if (!statusEl) return;
+  statusEl.textContent = text;
+  statusEl.style.color = color || "#666";
+}
+
+async function loadCustomModel() {
+  const fileInput = document.getElementById("model-upload");
+
+  if (!fileInput.files[0]) {
+    setStatus("⚠️ Please select your model file!", "red");
+    return;
+  }
+
   try {
-    gestureModel = await tf.loadLayersModel("gesture-model.json");
-    console.log("Gesture model loaded");
+    setStatus("⏳ Loading model...", "blue");
+
+    const fileContent = await fileInput.files[0].text();
+    const modelData = JSON.parse(fileContent);
+    const loaded = await loadModelFromSingleFileJson(modelData);
+
+    if (gestureModel) gestureModel.dispose();
+    gestureModel = loaded;
+
+    // Persist so refresh / next visit still works without re-upload
+    await saveModelToIdb(gestureModel);
+
+    resetCloneState();
+    setStatus("✅ Model loaded & saved locally! Make your hand sign!", "green");
+    console.log("✅ Custom model loaded!");
   } catch (e) {
-    console.error("Failed to load gesture model:", e);
+    console.error("Failed to load model:", e);
+    setStatus("❌ Error loading model. Try again.", "red");
+  }
+}
+
+async function loadLocalModel() {
+  try {
+    setStatus("⏳ Loading model from this browser...", "blue");
+    if (!(await hasSavedModel())) {
+      setStatus(
+        "No local model yet. Train one on the Train page, or upload a backup file.",
+        "#b45309"
+      );
+      return;
+    }
+
+    const loaded = await loadModelFromIdb();
+    if (gestureModel) gestureModel.dispose();
+    gestureModel = loaded;
+    setStatus("✅ Local model ready! Make your hand sign.", "green");
+    console.log("Gesture model loaded from IndexedDB");
+  } catch (e) {
+    console.error("Failed to load local model:", e);
+    setStatus(
+      "Could not load local model. Train again or upload a backup file.",
+      "red"
+    );
   }
 }
 
@@ -83,7 +90,7 @@ function normalizeHand(lm) {
   return out;
 }
 
-//change the threshold number to your preferance! 
+// change the threshold number to your preference!
 function predictGesture(right, left, threshold = 0.999) {
   if (!gestureModel || !right || !left) return false;
 
@@ -99,29 +106,42 @@ function predictGesture(right, left, threshold = 0.999) {
   return prob > threshold;
 }
 
-loadGestureModel();
+function resetCloneState() {
+  clonesTriggered = false;
+  cloneStartTime = null;
+  customClones.forEach((cl) => {
+    cl.smokeSpawned = false;
+  });
+
+  const img = document.getElementById("overlayImg");
+  const btn = img && img.closest(".video-overlay-btn");
+  if (img) {
+    img.src = "assets/state-1.png";
+    img.dataset.state = "1";
+  }
+  if (btn) btn.classList.remove("pop");
+}
 
 // ----------------------
 // Custom clones
 // ----------------------
-//feel free to play around with the clone positions, sizes, and delay time
 const customClones = [
-  { x: -100, y: 100, scale: 0.9,  delay: 1000, smokeSpawned: false },
-  { x:  120, y: 100, scale: 0.85, delay: 1150, smokeSpawned: false },
-  { x: -180, y: 140, scale: 0.8,  delay: 1300, smokeSpawned: false },
+  { x: -100, y: 100, scale: 0.9, delay: 1000, smokeSpawned: false },
+  { x: 120, y: 100, scale: 0.85, delay: 1150, smokeSpawned: false },
+  { x: -180, y: 140, scale: 0.8, delay: 1300, smokeSpawned: false },
   { x: -140, y: 140, scale: 0.45, delay: 1320, smokeSpawned: false },
-  { x:  180, y: 160, scale: 0.7,  delay: 1450, smokeSpawned: false },
-  { x:  140, y: 160, scale: 0.4,  delay: 1470, smokeSpawned: false },
-  { x: -250, y: 140, scale: 0.7,  delay: 1600, smokeSpawned: false },
+  { x: 180, y: 160, scale: 0.7, delay: 1450, smokeSpawned: false },
+  { x: 140, y: 160, scale: 0.4, delay: 1470, smokeSpawned: false },
+  { x: -250, y: 140, scale: 0.7, delay: 1600, smokeSpawned: false },
   { x: -220, y: 140, scale: 0.35, delay: 1620, smokeSpawned: false },
-  { x:  260, y: 160, scale: 0.65, delay: 1750, smokeSpawned: false },
-  { x: -100, y: 150, scale: 0.6,  delay: 2500, smokeSpawned: false },
-  { x:  100, y: 150, scale: 0.6,  delay: 2650, smokeSpawned: false },
-  { x: -120, y:  70, scale: 0.55, delay: 2800, smokeSpawned: false },
-  { x:  100, y:  70, scale: 0.5,  delay: 2950, smokeSpawned: false },
-  { x: -200, y:  85, scale: 0.55, delay: 3100, smokeSpawned: false },
-  { x:  230, y:  85, scale: 0.5,  delay: 3250, smokeSpawned: false },
-  { x: -280, y: 100, scale: 0.4,  delay: 3400, smokeSpawned: false },
+  { x: 260, y: 160, scale: 0.65, delay: 1750, smokeSpawned: false },
+  { x: -100, y: 150, scale: 0.6, delay: 2500, smokeSpawned: false },
+  { x: 100, y: 150, scale: 0.6, delay: 2650, smokeSpawned: false },
+  { x: -120, y: 70, scale: 0.55, delay: 2800, smokeSpawned: false },
+  { x: 100, y: 70, scale: 0.5, delay: 2950, smokeSpawned: false },
+  { x: -200, y: 85, scale: 0.55, delay: 3100, smokeSpawned: false },
+  { x: 230, y: 85, scale: 0.5, delay: 3250, smokeSpawned: false },
+  { x: -280, y: 100, scale: 0.4, delay: 3400, smokeSpawned: false },
 ];
 
 // ----------------------
@@ -196,6 +216,7 @@ function drawSmokes() {
     }
 
     const img = s.frames[frameIndex];
+    if (!img.complete || !img.naturalWidth) continue;
     ctx.save();
     ctx.translate(s.x, s.y);
     ctx.scale(s.scale, s.scale);
@@ -290,14 +311,14 @@ function grabPerson() {
 }
 
 // ----------------------
-// finger skeelton
+// finger skeleton
 // ----------------------
 const FINGER_INDICES = {
-  thumb:  [0, 1, 2, 3, 4],
-  index:  [0, 5, 6, 7, 8],
+  thumb: [0, 1, 2, 3, 4],
+  index: [0, 5, 6, 7, 8],
   middle: [0, 9, 10, 11, 12],
-  ring:   [0, 13, 14, 15, 16],
-  pinky:  [0, 17, 18, 19, 20],
+  ring: [0, 13, 14, 15, 16],
+  pinky: [0, 17, 18, 19, 20],
 };
 
 function drawFingerSkeleton(lm) {
@@ -346,9 +367,19 @@ function toggleImage() {
 }
 
 // ----------------------
-// Reset everything on load 
+// Init
 // ----------------------
 window.onload = () => {
-  clonesTriggered = false;
-  cloneStartTime = null;
+  resetCloneState();
+  loadLocalModel();
 };
+
+document.getElementById("btn-reset-clones")?.addEventListener("click", () => {
+  resetCloneState();
+  setStatus(
+    gestureModel
+      ? "✅ Reset. Make your hand sign again."
+      : "No local model yet. Train one first.",
+    gestureModel ? "green" : "#b45309"
+  );
+});

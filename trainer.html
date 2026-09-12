@@ -10,19 +10,18 @@
 <body>
 <div class="container">
   <h1>Hand Gesture Trainer</h1>
-  <p class="subtitle">record samples, train the model, then test the model and export</p>
+  <p class="subtitle">record samples, train the model, then test — everything stays in this browser</p>
 
-  <!-- Link back to main app -->
   <div style="text-align: center; margin-bottom: 20px;">
     <a href="index.html" style="display: inline-block; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
-      ✨ Go to Main App
+      Go to Main App
     </a>
   </div>
 
   <div class="steps">
     <div class="step"><div class="step-num">1</div><div class="step-label">Record samples</div></div>
     <div class="step"><div class="step-num">2</div><div class="step-label">Train model</div></div>
-    <div class="step"><div class="step-num">3</div><div class="step-label">Test & export</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-label">Test & use</div></div>
   </div>
 
   <div class="video-wrap">
@@ -31,7 +30,6 @@
     <div id="rec-badge" class="recording-badge">● REC</div>
   </div>
 
-  <!-- Collect -->
   <div class="section">
     <div class="section-title">Collect Samples</div>
     <div class="rec-row">
@@ -43,7 +41,6 @@
     </div>
   </div>
 
-  <!-- Train -->
   <div class="section">
     <div class="section-title">Train & Test</div>
     <div class="conf-bar-wrap">
@@ -51,30 +48,25 @@
       <span id="conf-label" class="conf-label">0%</span>
     </div>
     <button type="button" id="btn-train" class="train-btn">Train Model</button>
-    <p id="train-status" class="status">Collect at least 50 samples per class, then train.</p>
+    <p id="train-status" class="status">Collect at least 5 samples per class, then train. Model auto-saves in this browser.</p>
   </div>
 
-  <!-- Utilities -->
   <div class="section">
     <div class="section-title">Data & Model</div>
     <div class="util-row">
       <button type="button" id="btn-export-data" class="util-btn">Export Data (.json)</button>
       <button type="button" id="btn-import-data" class="util-btn">Import Data</button>
-      <button type="button" id="btn-save-model" class="util-btn">Save Model (Single File)</button>
+      <button type="button" id="btn-save-model" class="util-btn">Save / Download Backup</button>
       <button type="button" id="btn-clear-data" class="util-btn danger">Clear All Data</button>
     </div>
     <input type="file" id="import-data-input" accept=".json" hidden>
   </div>
 </div>
 
-<!-- TensorFlow.js -->
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-
-<!-- MediaPipe -->
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/holistic/holistic.js"></script>
-
-<!-- Trainer -->
+<script src="storage.js"></script>
 <script src="trainer.js"></script>
 </body>
 </html>

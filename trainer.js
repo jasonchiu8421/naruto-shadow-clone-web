@@ -6,18 +6,18 @@ const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
 const holistic = new Holistic({
-  locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${f}`
+  locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/holistic/${f}`,
 });
 holistic.setOptions({ modelComplexity: 1, smoothLandmarks: true });
 
 const cam = new Camera(video, {
   width: 640,
   height: 480,
-  onFrame: async () => await holistic.send({ image: video })
+  onFrame: async () => await holistic.send({ image: video }),
 });
 cam.start();
 
-holistic.onResults(res => {
+holistic.onResults((res) => {
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -37,7 +37,9 @@ holistic.onResults(res => {
 
   // Live inference
   if (model && res.rightHandLandmarks && res.leftHandLandmarks) {
-    const input = tf.tensor2d([extract(res.rightHandLandmarks, res.leftHandLandmarks)]);
+    const input = tf.tensor2d([
+      extract(res.rightHandLandmarks, res.leftHandLandmarks),
+    ]);
     const prob = model.predict(input).dataSync()[0];
     input.dispose();
     updateConf(prob);
@@ -53,7 +55,7 @@ function drawHand(lm) {
     [0, 5, 6, 7, 8],
     [0, 9, 10, 11, 12],
     [0, 13, 14, 15, 16],
-    [0, 17, 18, 19, 20]
+    [0, 17, 18, 19, 20],
   ];
   ctx.strokeStyle = "#22c55e";
   ctx.lineWidth = 2;
@@ -68,9 +70,15 @@ function drawHand(lm) {
     ctx.stroke();
   }
 
-  lm.forEach(p => {
+  lm.forEach((p) => {
     ctx.beginPath();
-    ctx.arc(canvas.width - p.x * canvas.width, p.y * canvas.height, 3, 0, Math.PI * 2);
+    ctx.arc(
+      canvas.width - p.x * canvas.width,
+      p.y * canvas.height,
+      3,
+      0,
+      Math.PI * 2
+    );
     ctx.fillStyle = "#ef4444";
     ctx.fill();
   });
@@ -80,10 +88,12 @@ function drawHand(lm) {
 // landmark processing
 // ----------------------
 function normalize(lm) {
-  const w = lm[0], mcp = lm[9];
-  const scale = Math.sqrt(
-    (mcp.x - w.x) ** 2 + (mcp.y - w.y) ** 2 + (mcp.z - w.z) ** 2
-  ) || 1;
+  const w = lm[0],
+    mcp = lm[9];
+  const scale =
+    Math.sqrt(
+      (mcp.x - w.x) ** 2 + (mcp.y - w.y) ** 2 + (mcp.z - w.z) ** 2
+    ) || 1;
   const out = [];
   for (let i = 0; i < 21; i++) {
     out.push((lm[i].x - w.x) / scale);
@@ -106,15 +116,28 @@ let model = null;
 
 const statusEl = document.getElementById("train-status");
 
-function captureFrame(right, left) {
-  if (!recording || !right || !left) return;
-  samples[recording].push(extract(right, left));
-  document.getElementById("count-clone").textContent = samples.clone_sign.length;
+function updateSampleCounts() {
+  document.getElementById("count-clone").textContent =
+    samples.clone_sign.length;
   document.getElementById("count-other").textContent = samples.not_sign.length;
 }
 
-const COUNTDOWN = 3;     // countdown before recording starts
-const RECORD_TIME = 4;   // recording time
+async function persistSamples() {
+  try {
+    await saveSamples(samples);
+  } catch (e) {
+    console.error("Failed to persist samples:", e);
+  }
+}
+
+function captureFrame(right, left) {
+  if (!recording || !right || !left) return;
+  samples[recording].push(extract(right, left));
+  updateSampleCounts();
+}
+
+const COUNTDOWN = 3; // countdown before recording starts
+const RECORD_TIME = 4; // recording time
 
 let countdownTimer = null;
 let recordTimer = null;
@@ -128,7 +151,9 @@ function startCountdown(label) {
 
   badge.classList.add("active");
   badge.textContent = `GET READY… ${remaining}`;
-  statusEl.textContent = `Recording "${label === "clone_sign" ? "clone sign" : "other"}" in ${remaining}s — get into position!`;
+  statusEl.textContent = `Recording "${
+    label === "clone_sign" ? "clone sign" : "other"
+  }" in ${remaining}s — get into position!`;
 
   countdownTimer = setInterval(() => {
     remaining--;
@@ -151,7 +176,9 @@ function startRec(label) {
 
   let remaining = RECORD_TIME;
   badge.textContent = `● REC ${remaining}s`;
-  statusEl.textContent = `Recording "${label === "clone_sign" ? "clone sign" : "other"}" — hold your pose!`;
+  statusEl.textContent = `Recording "${
+    label === "clone_sign" ? "clone sign" : "other"
+  }" — hold your pose!`;
 
   recordTimer = setInterval(() => {
     remaining--;
@@ -169,6 +196,7 @@ function stopRec() {
   clearInterval(recordTimer);
   recordTimer = null;
   document.getElementById("rec-badge").classList.remove("active");
+  persistSamples();
 }
 
 function cancelRecording() {
@@ -181,14 +209,16 @@ function cancelRecording() {
 }
 
 // Click-to-toggle buttons
-["btn-rec-clone", "btn-rec-other"].forEach(id => {
+["btn-rec-clone", "btn-rec-other"].forEach((id) => {
   const label = id.includes("clone") ? "clone_sign" : "not_sign";
-  document.getElementById(id).addEventListener("click", () => startCountdown(label));
+  document
+    .getElementById(id)
+    .addEventListener("click", () => startCountdown(label));
 });
 
 // Keyboard: tap 1 / 2
-const keyMap = { "1": "clone_sign", "2": "not_sign" };
-document.addEventListener("keydown", e => {
+const keyMap = { 1: "clone_sign", 2: "not_sign" };
+document.addEventListener("keydown", (e) => {
   if (!e.repeat && keyMap[e.key]) startCountdown(keyMap[e.key]);
 });
 
@@ -204,9 +234,16 @@ document.getElementById("btn-train").addEventListener("click", async () => {
     return;
   }
 
-  const xs = [], ys = [];
-  samples.clone_sign.forEach(s => { xs.push(s); ys.push(1); });
-  samples.not_sign.forEach(s => { xs.push(s); ys.push(0); });
+  const xs = [],
+    ys = [];
+  samples.clone_sign.forEach((s) => {
+    xs.push(s);
+    ys.push(1);
+  });
+  samples.not_sign.forEach((s) => {
+    xs.push(s);
+    ys.push(0);
+  });
 
   // Shuffle
   for (let i = xs.length - 1; i > 0; i--) {
@@ -218,22 +255,19 @@ document.getElementById("btn-train").addEventListener("click", async () => {
   const xT = tf.tensor2d(xs);
   const yT = tf.tensor1d(ys);
 
-  // ------- Using a NN ------ //
   if (model) model.dispose();
   model = tf.sequential();
-  // Mess around with the NN model topology to try and get better performance. 
-  // Keep in mind bias-variance tradeoffs and over/under fitting
-  model.add(tf.layers.dense({ inputShape: [126], units: 64, activation: "relu" }));
+  model.add(
+    tf.layers.dense({ inputShape: [126], units: 64, activation: "relu" })
+  );
   model.add(tf.layers.dropout({ rate: 0.3 }));
   model.add(tf.layers.dense({ units: 32, activation: "relu" }));
   model.add(tf.layers.dense({ units: 1, activation: "sigmoid" }));
-  model.compile({ optimizer: "adam", loss: "binaryCrossentropy", metrics: ["accuracy"] });
-
-  // ------- Using LR, TF equivalent ------ //
-  // if (model) model.dispose();
-  // model = tf.sequential();
-  // model.add(tf.layers.dense({ inputShape: [126], units: 1, activation: "sigmoid" }));
-  // model.compile({ optimizer: "adam", loss: "binaryCrossentropy", metrics: ["accuracy"] });
+  model.compile({
+    optimizer: "adam",
+    loss: "binaryCrossentropy",
+    metrics: ["accuracy"],
+  });
 
   document.getElementById("btn-train").disabled = true;
   statusEl.textContent = "Training...";
@@ -244,23 +278,39 @@ document.getElementById("btn-train").addEventListener("click", async () => {
     shuffle: true,
     callbacks: {
       onEpochEnd: (ep, logs) => {
-        statusEl.textContent = `Epoch ${ep + 1}/50 — acc: ${(logs.acc * 100).toFixed(1)}%`;
-      }
-    }
+        statusEl.textContent = `Epoch ${ep + 1}/50 — acc: ${(
+          logs.acc * 100
+        ).toFixed(1)}%`;
+      },
+    },
   });
 
   xT.dispose();
   yT.dispose();
   document.getElementById("btn-train").disabled = false;
-  statusEl.textContent = `Done! ${nP + nN} samples. Model is live — test your sign above.`;
+
+  try {
+    await saveModelToIdb(model);
+    await persistSamples();
+    statusEl.textContent = `Done! ${
+      nP + nN
+    } samples. Model saved locally — test here or open Main App.`;
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = `Training done, but local save failed: ${e.message}`;
+  }
 });
 
 // ----------------------
 // confidence bar
 // ----------------------
 function updateConf(prob) {
-  document.getElementById("conf-fill").style.width = `${(prob * 100).toFixed(0)}%`;
-  document.getElementById("conf-label").textContent = `${(prob * 100).toFixed(0)}%`;
+  document.getElementById("conf-fill").style.width = `${(prob * 100).toFixed(
+    0
+  )}%`;
+  document.getElementById("conf-label").textContent = `${(prob * 100).toFixed(
+    0
+  )}%`;
 }
 
 // ----------------------
@@ -278,50 +328,76 @@ document.getElementById("btn-import-data").addEventListener("click", () => {
   document.getElementById("import-data-input").click();
 });
 
-document.getElementById("import-data-input").addEventListener("change", e => {
+document.getElementById("import-data-input").addEventListener("change", (e) => {
   const reader = new FileReader();
-  reader.onload = ev => {
+  reader.onload = async (ev) => {
     const data = JSON.parse(ev.target.result);
     samples.clone_sign.push(...(data.clone_sign || []));
     samples.not_sign.push(...(data.not_sign || []));
-    document.getElementById("count-clone").textContent = samples.clone_sign.length;
-    document.getElementById("count-other").textContent = samples.not_sign.length;
-    statusEl.textContent = "Data imported.";
+    updateSampleCounts();
+    await persistSamples();
+    statusEl.textContent = "Data imported and saved locally.";
   };
   reader.readAsText(e.target.files[0]);
 });
 
 // ----------------------
-// save / clear model (SINGLE FILE)
+// save / clear model
 // ----------------------
 document.getElementById("btn-save-model").addEventListener("click", async () => {
   if (!model) {
     statusEl.textContent = "Train a model first.";
     return;
   }
-  
-  // Save as single file
-  const modelArtifacts = await model.save(tf.io.withSaveHandler(async (artifacts) => {
-    // Combine everything into one JSON
-    const combined = {
-      modelTopology: artifacts.modelTopology,
-      weightSpecs: artifacts.weightSpecs,
-      weightData: Array.from(new Uint8Array(artifacts.weightData))
-    };
-    
-    const blob = new Blob([JSON.stringify(combined)], { type: "application/json" });
+
+  try {
+    await saveModelToIdb(model);
+
+    // Optional download backup as a single JSON file
+    const combined = await modelArtifactsToSingleFile(model);
+    const blob = new Blob([JSON.stringify(combined)], {
+      type: "application/json",
+    });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = "gesture-model-single.json";
     a.click();
-    
-    statusEl.textContent = "Model saved as single file! Upload it to the main app.";
-  }));
+
+    statusEl.textContent =
+      "Model saved locally + downloaded. Main App will load it automatically.";
+  } catch (e) {
+    console.error(e);
+    statusEl.textContent = `Save failed: ${e.message}`;
+  }
 });
 
-document.getElementById("btn-clear-data").addEventListener("click", () => {
+document.getElementById("btn-clear-data").addEventListener("click", async () => {
   samples = { clone_sign: [], not_sign: [] };
-  document.getElementById("count-clone").textContent = "0";
-  document.getElementById("count-other").textContent = "0";
-  statusEl.textContent = "Data cleared.";
+  updateSampleCounts();
+  await clearSamples();
+  if (model) {
+    model.dispose();
+    model = null;
+  }
+  await clearModelFromIdb();
+  statusEl.textContent = "Samples and local model cleared.";
 });
+
+// ----------------------
+// restore local state on load
+// ----------------------
+(async function restoreLocalState() {
+  try {
+    samples = await loadSamples();
+    updateSampleCounts();
+
+    if (await hasSavedModel()) {
+      model = await loadModelFromIdb();
+      statusEl.textContent = `Restored ${samples.clone_sign.length + samples.not_sign.length} samples and local model. Ready to test or retrain.`;
+    } else if (samples.clone_sign.length || samples.not_sign.length) {
+      statusEl.textContent = `Restored ${samples.clone_sign.length + samples.not_sign.length} samples. Train when ready.`;
+    }
+  } catch (e) {
+    console.error("Failed to restore local state:", e);
+  }
+})();
