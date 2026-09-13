@@ -1,0 +1,24 @@
+services:
+  nocodile:
+    build: .
+    container_name: nocodile
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    # Optional: bind to specific interface (e.g., 127.0.0.1:8080:80 for reverse proxy)
+    # ports:
+    #   - "127.0.0.1:8080:80"
+
+# For production with reverse proxy (nginx/traefik/caddy on host):
+# services:
+#   nocodile:
+#     build: .
+#     expose:
+#       - "80"
+#     restart: unless-stopped
+#     networks:
+#       - web
+#
+# networks:
+#   web:
+#     external: true
